@@ -179,10 +179,10 @@ int main(int argc, char** argv) {
 	auto instance = load_dimacs(argv[1]);
 	Solver solver(instance);
 	bool sat = solver.solve();
-	std::cout << sat ? "sat!" : "unsat!" << std::endl;
+	std::cout << (sat ? "sat!" : "unsat!") << std::endl;
 	for (auto p : solver.trail)
 		std::cout << " " << lit_to_var(p.second) + 1 << "=" \
-			<< get_sign(p.second) ? "⊤" : "⊥";
+			<< (get_sign(p.second) ? "⊤" : "⊥");
 	std::cout << std::endl;
 }
 
