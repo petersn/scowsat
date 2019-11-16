@@ -1,4 +1,7 @@
 // ScowSAT
+// Known bugs:
+//   1) If the input DIMACS file doesn't have at least one octet after the final 0 on the final clause then we fail to parse the final clause.
+//   2) IF the input DIMACS file contains any unit or empty clauses then we'll do the wrong thing.
 
 #include <algorithm>
 #include <unordered_set>
@@ -148,7 +151,20 @@ std::pair<bool, Lit> Solver::pop_assignment() {
 }
 
 bool Solver::solve() {
-	// TODO: Add an initial pass looking for units.
+	// Look for initial units or empty clauses.
+	for (auto& clause : instance) {
+		// An empy clause is unsatisfiable!
+		if (clause.size() == 0)
+			return false;
+		// Push all units we find onto the queue for initial processing.
+		if (clause.size() == 1) {
+			Lit unit_literal = clause[0];
+			if (assignments.at(lit_to_var(unit_literal)) == flip_sign(get_sign(unit_literal)))
+				return false;
+			push_assignment(false, clause[0]);
+		}
+	}
+
 	while (true) {
 		bool conflict = unit_propagation();
 		if (conflict) {
@@ -184,5 +200,6 @@ int main(int argc, char** argv) {
 		std::cout << " " << lit_to_var(p.second) + 1 << "=" \
 			<< (get_sign(p.second) ? "⊤" : "⊥");
 	std::cout << std::endl;
+	return sat ? 10 : 20;
 }
 
