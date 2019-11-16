@@ -1,5 +1,6 @@
 
-CXXFLAGS=-Ofast -Wall -Wextra -std=c++17 -g
+CXXFLAGS=-Wall -Wextra -std=c++17 -g -pthread
+CXXFLAGS+=-Ofast
 
 scowsat: scowsat.o
 	$(CXX) $(CXXFLAGS) -o $@ $^

@@ -28,10 +28,10 @@ def test_sat_solver(args):
 	for path in sorted(glob.glob("test_instances/*.dimacs")):
 
 		var_count = int(path.split("vars")[1].split("_")[0])
-		if not ((100 <= var_count <= 120 and args.medium_sized) or (var_count <= 100 and not args.medium_sized)):
+		if not ((140 <= var_count <= 200 and args.medium_sized) or (var_count <= 100 and not args.medium_sized)):
 			continue
 
-		print(path, end=" ")
+		print("%s %5s " % (path, mapping[path]), end="")
 		sys.stdout.flush()
 		retcode = subprocess.call([args.solver, path], stdout=devnull)	
 		if retcode_to_string[retcode] == mapping[path]:
@@ -59,5 +59,5 @@ if __name__ == "__main__":
 	start = time.time()
 	test_sat_solver(args)
 	elapsed = time.time() - start
-	print("Time: %.2fms" % (1e3 * elapsed,))
+	print("Time: %.3f s" % (elapsed,))
 
