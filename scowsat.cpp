@@ -1,7 +1,7 @@
 // ScowSAT
 // Known bugs:
 //   1) If the input DIMACS file doesn't have at least one octet after the final 0 on the final clause then we fail to parse the final clause.
-//   2) IF the input DIMACS file contains any unit or empty clauses then we'll do the wrong thing.
+//   2) If the input DIMACS file contains any unit or empty clauses then we'll do the wrong thing.
 
 #include <algorithm>
 #include <unordered_set>
@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include "scowsat.h"
 
-constexpr int CUTOFF = 8;
+constexpr int CUTOFF = 128;
 
 static std::random_device global_random_device;
 
@@ -370,7 +370,9 @@ std::pair<bool, Lit> SolverState::pop_assignment() {
 
 int main(int argc, char** argv) {
 	Instance instance(load_dimacs(argv[1]));
-	ParallelSolver ps(std::move(instance), 4);
+	int threads = std::thread::hardware_concurrency();
+	std::cout << "Using " << threads << " threads." << std::endl;
+	ParallelSolver ps(std::move(instance), threads);
 	ps.solve();
 	ps.join();
 	std::cout << (ps.found_solution ? "SAT" : "UNSAT") << std::endl;
