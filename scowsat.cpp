@@ -16,6 +16,12 @@ constexpr int CUTOFF = 8;
 
 static std::random_device global_random_device;
 
+#ifdef DEBUG_COUNTS
+std::atomic<long long> decisions{0};
+std::atomic<long long> queue_insertions{0};
+std::atomic<long long> units_found{0};
+#endif
+
 std::vector<std::vector<Lit>> load_dimacs(std::string path) {
 	std::vector<std::vector<Lit>> instance;
 
@@ -102,7 +108,7 @@ Instance::Instance(std::vector<std::vector<Lit>> clauses)
 			max_var = std::max(max_var, lit_to_var(lit));
 	var_count = static_cast<int>(max_var) + 1;
 
-	std::vector<std::pair<Lit, int>> literal_occurrences;
+	std::vector<std::pair<Lit, double>> literal_occurrences;
 	for (Lit lit = 0; lit < 2 * var_count; lit++)
 		literal_occurrences.emplace_back(lit, 0);
 
@@ -111,7 +117,8 @@ Instance::Instance(std::vector<std::vector<Lit>> clauses)
 	for (auto& clause : clauses) {
 		for (Lit lit : clause) {
 			literal_to_containing_clauses[lit].push_back(clause_index);
-			literal_occurrences[lit].second++;
+			literal_occurrences[lit].second += 1.01;
+			literal_occurrences[flip_sign(lit)].second += 1;
 		}
 		clause_index++;
 	}
@@ -119,7 +126,7 @@ Instance::Instance(std::vector<std::vector<Lit>> clauses)
 	std::sort(
 		literal_occurrences.begin(),
 		literal_occurrences.end(),
-		[](std::pair<Lit, int>& a, std::pair<Lit, int>& b) {
+		[](std::pair<Lit, double>& a, std::pair<Lit, double>& b) {
 			// NB: Intentionally reversed sort.
 			return a.second > b.second;
 		}
@@ -151,6 +158,7 @@ void Worker::thread_main(Worker* self) {
 			break;
 		bool result = do_work(self, work);
 		if (result) {
+			std::cerr << "Total puts: " << self->parent->work_queue.total_puts << " ";
 			exit(10);
 //			std::cout << "Found solution!" << std::endl;
 			self->parent->found_solution = true;
@@ -186,6 +194,9 @@ bool Worker::do_work(Worker* self, WorkItem& work) {
 			}
 			state.committed_length = state.trail.size() - 1;
 		} else {
+#ifdef DEBUG_COUNTS
+			decisions++;
+#endif
 			auto trail_size = state.trail.size();
 			if (trail_size == state.assignments.size())
 				return true;
@@ -193,21 +204,26 @@ bool Worker::do_work(Worker* self, WorkItem& work) {
 			Lit decision = state.decide(instance, 0);
 			// Figure out if we should branch here.
 			if (
+//				false
 				trail_size < self->parent->trail_cutoff and
+//				(self->rng() & 0xf) == 0 and
 				self->parent->work_queue.queue_length <= CUTOFF
 			) {
 				state.push_assignment(false, flip_sign(decision));
 				self->parent->work_items++;
 				self->parent->work_queue.put({false, SolverState(state)});
+#ifdef DEBUG_COUNTS
+				queue_insertions++;
+#endif
 				state.pop_assignment();
 				state.push_assignment(false, decision);
 			} else {
+//				std::cout << "Failing to branch because:" << trail_size << " " << self->parent->trail_cutoff << " " << self->parent->work_queue.queue_length << std::endl;
 				state.push_assignment(true, decision);
 			}
 		}
 	}
 }
-
 
 ParallelSolver::ParallelSolver(Instance&& instance, int thread_count)
 	: instance(instance) // NB: Do I need std::move again here?
@@ -219,8 +235,7 @@ ParallelSolver::ParallelSolver(Instance&& instance, int thread_count)
 
 void ParallelSolver::solve() {
 	SolverState initial_state(instance);
-//	trail_cutoff = 0.7 * instance.var_count;
-	trail_cutoff = 1000000;
+	trail_cutoff = 0.05 * instance.var_count;
 	if (workers.size() == 1)
 		trail_cutoff = 0;
 
@@ -280,8 +295,12 @@ bool SolverState::unit_propagate(const Instance& instance) {
 			}
 			if (unassigned_lits == 0)
 				return true;
-			if (unassigned_lits == 1)
+			if (unassigned_lits == 1) {
+#ifdef DEBUG_COUNTS
+				units_found++;
+#endif
 				push_assignment(false, unit_literal);
+			}
 			clause_satisfied:;
 		}
 		committed_length++;
@@ -312,6 +331,7 @@ Lit SolverState::decide(const Instance& instance, uint32_t randomness) {
 	assert(false); // Oh no!
 }
 
+/*
 bool SolverState::solve(const Instance& instance) {
 	while (true) {
 		bool conflict = unit_propagate(instance);
@@ -334,6 +354,7 @@ bool SolverState::solve(const Instance& instance) {
 		}
 	}
 }
+*/
 
 void SolverState::push_assignment(bool is_decision, Lit literal) {
 	trail.emplace_back(is_decision, literal);
@@ -349,10 +370,14 @@ std::pair<bool, Lit> SolverState::pop_assignment() {
 
 int main(int argc, char** argv) {
 	Instance instance(load_dimacs(argv[1]));
-	ParallelSolver ps(std::move(instance), 2);
+	ParallelSolver ps(std::move(instance), 4);
 	ps.solve();
 	ps.join();
 	std::cout << (ps.found_solution ? "SAT" : "UNSAT") << std::endl;
+#ifdef DEBUG_COUNTS
+	std::cerr << "Decisions: " << decisions << " Units: " << units_found << " Enqueues: " << queue_insertions << std::endl;
+#endif
+	std::cerr << "Total puts: " << ps.work_queue.total_puts << " ";
 	return ps.found_solution ? 10 : 20;
 }
 

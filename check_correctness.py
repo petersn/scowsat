@@ -28,7 +28,8 @@ def test_sat_solver(args):
 	for path in sorted(glob.glob("test_instances/*.dimacs")):
 
 		var_count = int(path.split("vars")[1].split("_")[0])
-		if not ((140 <= var_count <= 200 and args.medium_sized) or (var_count <= 100 and not args.medium_sized)):
+#		if not ((140 <= var_count <= 200 and args.medium_sized) or (var_count <= 100 and not args.medium_sized)):
+		if not ((160 <= var_count <= 200 and args.medium_sized) or (var_count <= 100 and not args.medium_sized)):
 			continue
 
 		print("%s %5s " % (path, mapping[path]), end="")
@@ -40,6 +41,7 @@ def test_sat_solver(args):
 			print("FAILURE!!!")
 			any_failures = True
 	if any_failures:
+		print("Failure! " * 100)
 		exit(1)
 
 parser = argparse.ArgumentParser()

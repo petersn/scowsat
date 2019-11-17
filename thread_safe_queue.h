@@ -13,10 +13,13 @@ struct thread_safe_queue {
 	std::mutex queue_mutex;
 	std::condition_variable cv;
 	std::queue<T> contents;
-	std::atomic<int> queue_length;
+	std::atomic<int> queue_length{0};
+	std::atomic<int> total_puts{0};
 
 	void put(T&& t) {
+		total_puts++;
 		{
+
 			std::unique_lock<std::mutex> lk(queue_mutex);
 			contents.push(std::move(t));
 			queue_length++;
