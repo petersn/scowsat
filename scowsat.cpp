@@ -235,7 +235,7 @@ ParallelSolver::ParallelSolver(Instance&& instance, int thread_count)
 
 void ParallelSolver::solve() {
 	SolverState initial_state(instance);
-	trail_cutoff = 0.05 * instance.var_count;
+	trail_cutoff = 0.1 * instance.var_count;
 	if (workers.size() == 1)
 		trail_cutoff = 0;
 
